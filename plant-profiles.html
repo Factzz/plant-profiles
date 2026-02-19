@@ -1,0 +1,226 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+    .pp-container { font-family: 'Inter', sans-serif !important; text-align: center; padding: 20px 15px; color: #333; }
+    
+    /* Header & Sync Button */
+    .pp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; text-align: left;}
+    .pp-title h2 { margin: 0; font-size: 1.2rem; font-weight: 800; color: #4CAF50; }
+    .pp-title p { margin: 0; font-size: 0.8rem; color: #888; }
+    .btn-sync { background: #f0f0f5; border: none; padding: 8px 12px; border-radius: 10px; color: #007AFF; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 0.8rem; }
+    .btn-sync:active { transform: scale(0.95); background: #e0e0e5; }
+    
+    /* Search Bar */
+    .search-box { position: relative; margin-bottom: 20px; }
+    .search-box i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #aaa; }
+    .search-input { width: 100%; padding: 12px 15px 12px 40px; border-radius: 12px; border: 1px solid #ddd; font-size: 0.9rem; outline: none; background: rgba(255,255,255,0.8); }
+
+    /* Grid & Cards */
+    .profiles-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; max-height: 40vh; overflow-y: auto; padding-bottom: 10px; }
+    .profile-card { background: white; border: 2px solid transparent; border-radius: 16px; padding: 15px 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between; }
+    .profile-card.selected { border-color: #4CAF50; background: #f1fcf1; box-shadow: 0 8px 20px rgba(76, 175, 80, 0.15); transform: translateY(-2px); }
+    .pc-icon { font-size: 2rem; margin-bottom: 5px; }
+    .pc-name { font-weight: 700; font-size: 0.85rem; margin-bottom: 8px; line-height: 1.2; }
+    .pc-stats { display: flex; justify-content: center; gap: 5px; font-size: 0.7rem; color: #666; }
+    .pc-stats span { background: #f0f0f5; padding: 3px 6px; border-radius: 6px; font-weight: 600; }
+
+    /* Zone Selector & Apply */
+    .action-area { background: white; padding: 15px; border-radius: 16px; box-shadow: 0 -5px 20px rgba(0,0,0,0.05); text-align: left; }
+    .action-area label { font-size: 0.85rem; font-weight: 700; color: #555; display: block; margin-bottom: 10px; }
+    select.zone-select { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #eee; background: #f9f9f9; font-size: 1rem; font-weight: 600; color: #333; outline: none; margin-bottom: 15px; }
+    
+    .btn-apply { background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); color: white; border: none; padding: 15px; border-radius: 16px; font-size: 1rem; font-weight: 700; width: 100%; cursor: pointer; box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3); transition: 0.2s; }
+    .btn-apply:active { transform: scale(0.96); }
+    .btn-apply:disabled { background: #ccc; box-shadow: none; cursor: not-allowed; }
+    
+    /* Scrollbar */
+    .profiles-grid::-webkit-scrollbar { width: 6px; }
+    .profiles-grid::-webkit-scrollbar-thumb { background: #ddd; border-radius: 10px; }
+</style>
+
+<div class="glass-card pp-container">
+    <div class="pp-header">
+        <div class="pp-title">
+            <h2>Cloud Profiles</h2>
+            <p id="db-status">ข้อมูลล่าสุด: กำลังโหลด...</p>
+        </div>
+        <button class="btn-sync" id="btn-sync" onclick="window.CloudProfiles.fetchDatabase()">
+            <i class="fa-solid fa-rotate"></i> อัปเดต
+        </button>
+    </div>
+
+    <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" class="search-input" id="search-input" placeholder="ค้นหาต้นไม้ (เช่น โรสแมรี่, กล้วยไม้)..." onkeyup="window.CloudProfiles.filterProfiles()">
+    </div>
+
+    <div class="profiles-grid" id="profiles-grid">
+        <div style="grid-column: 1/-1; text-align:center; padding: 20px; color:#999;">
+            <i class="fa-solid fa-circle-notch fa-spin"></i> กำลังเชื่อมต่อ Database...
+        </div>
+    </div>
+
+    <div class="action-area">
+        <label><i class="fa-solid fa-location-dot" style="color:#007AFF;"></i> เลือกโซนที่ปลูก</label>
+        <select id="zone-selector" class="zone-select">
+            <option value="0">Zone 1</option>
+            <option value="1">Zone 2</option>
+            <option value="2">Zone 3</option>
+            <option value="3">Zone 4</option>
+        </select>
+
+        <button id="btn-apply-profile" class="btn-apply" onclick="window.CloudProfiles.applyProfile()" disabled>
+            <i class="fa-solid fa-download"></i> โหลดสูตรเข้าระบบ
+        </button>
+    </div>
+</div>
+
+<script type="module">
+    import { RosemarySDK } from './js/sdk.js';
+
+    // [CONFIG] เปลี่ยนลิงก์นี้ให้ตรงกับ URL ของไฟล์ plant-db.json ใน GitHub ของท่าน
+    const DATABASE_URL = "https://raw.githubusercontent.com/Factzz/rosemary-store/refs/heads/main/plant-db.json";
+    
+    let plantDatabase = [];
+    let selectedProfileId = null;
+
+    window.CloudProfiles = {
+        async init() {
+            // โหลดแคชเดิมก่อน ถ้ามี
+            const cached = localStorage.getItem('rosemary_plant_db');
+            if(cached) {
+                plantDatabase = JSON.parse(cached);
+                this.renderProfiles();
+                document.getElementById('db-status').innerText = "ข้อมูลล่าสุด: จากในเครื่อง";
+            }
+            // แอบอัปเดตเบื้องหลัง
+            await this.fetchDatabase(false);
+        },
+
+        async fetchDatabase(showUI = true) {
+            const btn = document.getElementById('btn-sync');
+            if(showUI) {
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sync...';
+                document.getElementById('db-status').innerText = "กำลังดาวน์โหลด...";
+            }
+
+            try {
+                // เติม Timestamp กัน Cache
+                const res = await fetch(DATABASE_URL + '?t=' + new Date().getTime());
+                if(!res.ok) throw new Error("Network Error");
+                
+                const data = await res.json();
+                plantDatabase = data;
+                localStorage.setItem('rosemary_plant_db', JSON.stringify(plantDatabase)); // อัปเดต Cache
+                
+                this.renderProfiles();
+                
+                document.getElementById('db-status').innerText = "สถานะ: อัปเดตล่าสุดแล้ว ✅";
+                if(showUI && window.showToast) window.showToast("อัปเดตฐานข้อมูลสำเร็จ!");
+
+            } catch(e) {
+                console.error(e);
+                if(showUI && window.showToast) window.showToast("ไม่สามารถดึงข้อมูลออนไลน์ได้");
+                document.getElementById('db-status').innerText = "สถานะ: ออฟไลน์ (ใช้ข้อมูลเดิม)";
+            }
+
+            if(showUI) btn.innerHTML = '<i class="fa-solid fa-rotate"></i> อัปเดต';
+        },
+
+        renderProfiles(filterText = "") {
+            const grid = document.getElementById('profiles-grid');
+            grid.innerHTML = '';
+
+            const filteredDB = plantDatabase.filter(p => p.name.toLowerCase().includes(filterText.toLowerCase()));
+
+            if(filteredDB.length === 0) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 20px; color:#999;">ไม่พบต้นไม้ที่ค้นหา</div>';
+                return;
+            }
+
+            filteredDB.forEach(p => {
+                const isSelected = p.id === selectedProfileId;
+                const card = document.createElement('div');
+                card.className = `profile-card ${isSelected ? 'selected' : ''}`;
+                card.onclick = () => this.selectProfile(p.id);
+                
+                card.innerHTML = `
+                    <div class="pc-icon">${p.icon}</div>
+                    <div class="pc-name" style="color: ${isSelected ? p.color : '#333'}">${p.name}</div>
+                    <div class="pc-stats">
+                        <span style="color:#007AFF;"><i class="fa-solid fa-droplet"></i> ${p.threshold}%</span>
+                        <span style="color:#555;"><i class="fa-solid fa-clock"></i> ${p.duration}s</span>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        },
+
+        filterProfiles() {
+            const txt = document.getElementById('search-input').value;
+            this.renderProfiles(txt);
+        },
+
+        selectProfile(id) {
+            selectedProfileId = id;
+            this.renderProfiles(document.getElementById('search-input').value); // อัปเดต UI
+            
+            // เปิดปุ่มให้กด Apply ได้
+            const btn = document.getElementById('btn-apply-profile');
+            btn.disabled = false;
+            const profile = plantDatabase.find(p => p.id === id);
+            btn.innerHTML = `<i class="fa-solid fa-download"></i> โหลดสูตร "${profile.name}"`;
+        },
+
+        async applyProfile() {
+            const btn = document.getElementById('btn-apply-profile');
+            const zoneIndex = parseInt(document.getElementById('zone-selector').value);
+            const profile = plantDatabase.find(p => p.id === selectedProfileId);
+
+            if(!profile) return;
+
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> กำลังส่งข้อมูลเข้าบอร์ด...';
+            btn.disabled = true;
+
+            try {
+                const sysInfo = await RosemarySDK.getSystemInfo();
+                const plants = sysInfo.plants || [];
+                const targetPlant = plants.find(p => p.originalIndex === zoneIndex);
+
+                if (targetPlant) {
+                    // ส่งค่าไปที่บอร์ดผ่าน SDK
+                    const success = await RosemarySDK.updatePlantConfig(targetPlant.id, {
+                        threshold: profile.threshold,
+                        duration: profile.duration
+                    });
+
+                    if (success) {
+                        btn.style.background = "#1d1d1d";
+                        btn.innerHTML = '<i class="fa-solid fa-check"></i> เสร็จสมบูรณ์!';
+                        if(window.showToast) window.showToast(`บันทึกสูตร ${profile.name} ลง Zone ${zoneIndex + 1} แล้ว`);
+                        if(window.loadData) window.loadData();
+                    } else { throw new Error("Fail"); }
+                } else {
+                    if(window.showToast) window.showToast(`ระบุ Zone ผิดพลาด (ไม่พบต้นไม้)`);
+                    btn.style.background = "#FF9500";
+                    btn.innerHTML = '<i class="fa-solid fa-exclamation"></i> ไม่พบโซน';
+                }
+            } catch(e) {
+                if(window.showToast) window.showToast("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+                btn.style.background = "#FF3B30";
+                btn.innerHTML = '<i class="fa-solid fa-xmark"></i> ผิดพลาด';
+            }
+
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.style.background = "";
+                btn.disabled = false;
+            }, 2000);
+        }
+    };
+
+    window.CloudProfiles.init();
+</script>
