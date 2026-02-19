@@ -80,8 +80,8 @@
 <script type="module">
     import { RosemarySDK } from './js/sdk.js';
 
-    // [CONFIG] เปลี่ยนลิงก์นี้ให้ตรงกับ URL ของไฟล์ plant-db.json ใน GitHub ของท่าน
-    const DATABASE_URL = "https://raw.githubusercontent.com/Factzz/rosemary-store/refs/heads/main/plant-db.json";
+    
+    const DATABASE_URL = "https://raw.githubusercontent.com/Factzz/plant-profiles/refs/heads/main/plant-db.json";
     
     let plantDatabase = [];
     let selectedProfileId = null;
@@ -223,4 +223,5 @@
     };
 
     window.CloudProfiles.init();
+
 </script>
